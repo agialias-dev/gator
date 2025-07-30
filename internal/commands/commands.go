@@ -4,9 +4,11 @@ import (
 	"fmt"
 
 	"github.com/agialias-dev/gator/internal/config"
+	"github.com/agialias-dev/gator/internal/database"
 )
 
 type State struct {
+	Database       *database.Queries
 	Current_config *config.Config
 }
 

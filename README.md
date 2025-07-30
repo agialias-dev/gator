@@ -19,7 +19,7 @@ go build
 ## Usage
 
 ```bash
-./gator [options]
+./gator [login]
 ```
 
 ## Contributing
