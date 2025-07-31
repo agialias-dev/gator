@@ -37,6 +37,9 @@ func main() {
 	clicmds.Register("register", commands.HandlerRegister)
 	clicmds.Register("users", commands.HandlerUsers)
 	clicmds.Register("reset", commands.HandlerReset)
+	clicmds.Register("agg", commands.HandlerAggregate)
+	clicmds.Register("addfeed", commands.HandlerAddFeed)
+	clicmds.Register("feeds", commands.HandlerListFeeds)
 
 	if len(os.Args) < 2 {
 		log.Fatal("no arguments provided")

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/agialias-dev/gator/internal/database"
+	"github.com/agialias-dev/gator/internal/rss"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +18,7 @@ func HandlerLogin(s *State, cmd Command) error {
 	}
 	username := cmd.Args[0]
 
-	if _, err := s.Database.GetUser(context.Background(), sql.NullString{String: username, Valid: true}); err != nil {
+	if _, err := s.Database.GetUser(context.Background(), username); err != nil {
 		if err == sql.ErrNoRows {
 			log.Fatalf("User '%s' does not exist", username)
 		}
@@ -40,7 +41,7 @@ func HandlerRegister(s *State, cmd Command) error {
 	created_at := time.Now()
 	updated_at := time.Now()
 	name := cmd.Args[0]
-	if _, err := s.Database.GetUser(context, sql.NullString{String: name, Valid: true}); err == nil {
+	if _, err := s.Database.GetUser(context, name); err == nil {
 		log.Fatalf("User '%s' already exists", name)
 	} else if err != sql.ErrNoRows {
 		return fmt.Errorf("error checking user existence: %v", err)
@@ -50,12 +51,12 @@ func HandlerRegister(s *State, cmd Command) error {
 		ID:        id,
 		CreatedAt: created_at,
 		UpdatedAt: updated_at,
-		Name:      sql.NullString{String: name, Valid: true},
+		Name:      name,
 	})
 
 	s.Current_config.SetUser(name)
 
-	current_user, _ := s.Database.GetUser(context, sql.NullString{String: name, Valid: true})
+	current_user, _ := s.Database.GetUser(context, name)
 
 	fmt.Printf("User '%s' created\n", name)
 	printUser(current_user)
@@ -96,11 +97,79 @@ func HandlerUsers(s *State, cmd Command) error {
 
 	fmt.Println("Users:")
 	for _, user := range users {
-		if user.Name.String == s.Current_config.User {
-			fmt.Printf(" * %s (current)\n", user.Name.String)
+		if user.Name == s.Current_config.User {
+			fmt.Printf(" * %s (current)\n", user.Name)
 		} else {
-			fmt.Printf(" * %s\n", user.Name.String)
+			fmt.Printf(" * %s\n", user.Name)
 		}
+	}
+	return nil
+}
+
+func HandlerAggregate(s *State, cmd Command) error {
+	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return fmt.Errorf("error fetching RSS feed: %v", err)
+	}
+
+	fmt.Printf("Title: %s\n", feed.Channel.Title)
+	fmt.Printf("Link: %s\n", feed.Channel.Link)
+	fmt.Printf("Description: %s\n", feed.Channel.Description)
+	fmt.Printf("Items: %d\n", len(feed.Channel.Item))
+	for _, item := range feed.Channel.Item {
+		fmt.Printf(" * Title: %s\n", item.Title)
+		fmt.Printf(" * Link: %s\n", item.Link)
+		fmt.Printf(" * Description: %s\n", item.Description)
+	}
+	return nil
+}
+
+func HandlerAddFeed(s *State, cmd Command) error {
+	if len(cmd.Args) < 2 {
+		log.Fatal("addfeed command requires a name and url argument")
+	}
+
+	user, err := s.Database.GetUser(context.Background(), s.Current_config.User)
+	if err != nil {
+		return fmt.Errorf("error retrieving user: %v", err)
+	}
+
+	_, err = s.Database.CreateFeed(context.Background(), database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      cmd.Args[0],
+		Url:       cmd.Args[1],
+		UserID:    user.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("error creating feed: %v", err)
+	}
+
+	fmt.Printf("Feed '%s' successfully added\n", cmd.Args[0])
+	return nil
+}
+
+func HandlerListFeeds(s *State, cmd Command) error {
+	feeds, err := s.Database.GetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("error retrieving feeds: %v", err)
+	}
+
+	if len(feeds) == 0 {
+		fmt.Println("No feeds found.")
+		return nil
+	}
+
+	fmt.Println("Feeds:")
+	for _, feed := range feeds {
+		name, err := s.Database.FindUserName(context.Background(), feed.UserID)
+		if err != nil {
+			return fmt.Errorf("error retrieving user name: %v", err)
+		}
+		fmt.Printf(" * Name: %s\n", feed.Name)
+		fmt.Printf(" * URL: %s\n", feed.Url)
+		fmt.Printf(" * User: %s\n", name)
 	}
 	return nil
 }
