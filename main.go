@@ -38,8 +38,11 @@ func main() {
 	clicmds.Register("users", commands.HandlerUsers)
 	clicmds.Register("reset", commands.HandlerReset)
 	clicmds.Register("agg", commands.HandlerAggregate)
-	clicmds.Register("addfeed", commands.HandlerAddFeed)
+	clicmds.Register("addfeed", commands.MiddlewareLoggedIn(commands.HandlerAddFeed))
 	clicmds.Register("feeds", commands.HandlerListFeeds)
+	clicmds.Register("follow", commands.MiddlewareLoggedIn(commands.HandlerFollow))
+	clicmds.Register("following", commands.MiddlewareLoggedIn(commands.HandlerFollowing))
+	clicmds.Register("unfollow", commands.MiddlewareLoggedIn(commands.HandlerUnfollow))
 
 	if len(os.Args) < 2 {
 		log.Fatal("no arguments provided")

@@ -7,3 +7,20 @@ VALUES (
     $4
 )
 RETURNING *;
+
+-- name: GetUserByName :one
+SELECT * FROM users
+WHERE name = $1;
+
+-- name: FindUserName :one
+SELECT name FROM users
+WHERE id = $1;
+
+-- name: GetUsers :many
+SELECT * FROM users;
+
+-- name: GetFeedFollowsForUser :many
+SELECT feed_follows.*, users.name AS user_name, feeds.name AS feed_name FROM feed_follows
+JOIN users ON users.id = feed_follows.user_id
+JOIN feeds ON feeds.id = feed_follows.feed_id
+WHERE feed_follows.user_id = $1;
