@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/agialias-dev/gator/internal/database"
-	"github.com/agialias-dev/gator/internal/rss"
 	"github.com/google/uuid"
 )
 
@@ -107,26 +108,30 @@ func HandlerUsers(s *State, cmd Command) error {
 }
 
 func HandlerAggregate(s *State, cmd Command) error {
-	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	if err != nil {
-		return fmt.Errorf("error fetching RSS feed: %v", err)
+	if len(cmd.Args) < 1 {
+		return fmt.Errorf("aggregate command requires a duration argument")
 	}
 
-	fmt.Printf("Title: %s\n", feed.Channel.Title)
-	fmt.Printf("Link: %s\n", feed.Channel.Link)
-	fmt.Printf("Description: %s\n", feed.Channel.Description)
-	fmt.Printf("Items: %d\n", len(feed.Channel.Item))
-	for _, item := range feed.Channel.Item {
-		fmt.Printf(" * Title: %s\n", item.Title)
-		fmt.Printf(" * Link: %s\n", item.Link)
-		fmt.Printf(" * Description: %s\n", item.Description)
+	time_between_reqs, err := time.ParseDuration(cmd.Args[0])
+	if err != nil {
+		return fmt.Errorf("error parsing duration: %v", err)
 	}
+
+	fmt.Printf("Aggregating feeds every %v\n", time_between_reqs)
+	ticker := time.NewTicker(time_between_reqs)
+	for ; ; <-ticker.C {
+		s.ScrapeFeeds()
+	}
+
 	return nil
 }
 
 func HandlerAddFeed(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) < 2 {
 		log.Fatal("addfeed command requires a name and url argument")
+	}
+	if strings.HasPrefix(cmd.Args[0], "http://") || strings.HasPrefix(cmd.Args[0], "https://") {
+		log.Fatal("addfeed command requires a name first then the url")
 	}
 
 	feed, err := s.Database.CreateFeed(context.Background(), database.CreateFeedParams{
@@ -152,7 +157,7 @@ func HandlerAddFeed(s *State, cmd Command, user database.User) error {
 		return fmt.Errorf("error creating feed follow: %v", err)
 	}
 
-	fmt.Printf("Feed '%s' successfully followed\n", cmd.Args[0])
+	fmt.Printf("Feed '%s' successfully followed\n", cmd.Args[1])
 	return nil
 }
 
@@ -247,5 +252,40 @@ func HandlerUnfollow(s *State, cmd Command, user database.User) error {
 	}
 
 	fmt.Printf("%s successfully unfollowed %s\n", s.Current_config.User, cmd.Args[0])
+	return nil
+}
+
+func HandlerBrowse(s *State, cmd Command, user database.User) error {
+	limit := 2
+	if len(cmd.Args) == 1 {
+		if specifiedLimit, err := strconv.Atoi(cmd.Args[0]); err == nil {
+			limit = specifiedLimit
+		} else {
+			return fmt.Errorf("invalid limit: %w", err)
+		}
+	}
+
+	posts, err := s.Database.GetPostsForUser(context.Background(), database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int32(limit),
+	})
+	if err != nil {
+		return fmt.Errorf("error retrieving posts: %v", err)
+	}
+
+	if len(posts) == 0 {
+		fmt.Println("No posts found.")
+		return nil
+	}
+
+	fmt.Printf("Found %d posts for user %s:\n", len(posts), user.Name)
+	for _, post := range posts {
+		fmt.Printf("%s from %s\n", post.PublishedAt, post.FeedName)
+		fmt.Printf("--- %s ---\n", post.Title)
+		fmt.Printf("    %v\n", post.Description)
+		fmt.Printf("Link: %s\n", post.Url)
+		fmt.Println("=====================================")
+	}
+
 	return nil
 }

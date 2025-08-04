@@ -43,6 +43,7 @@ func main() {
 	clicmds.Register("follow", commands.MiddlewareLoggedIn(commands.HandlerFollow))
 	clicmds.Register("following", commands.MiddlewareLoggedIn(commands.HandlerFollowing))
 	clicmds.Register("unfollow", commands.MiddlewareLoggedIn(commands.HandlerUnfollow))
+	clicmds.Register("browse", commands.MiddlewareLoggedIn(commands.HandlerBrowse))
 
 	if len(os.Args) < 2 {
 		log.Fatal("no arguments provided")
