@@ -22,7 +22,7 @@ Go
 ## Set up
 
 ```bash
-create .gatorconfig.json
+create a .gatorconfig.json file in ~/
 touch ~/.gatorconfig.json
 ```
 
